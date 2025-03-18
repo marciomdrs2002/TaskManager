@@ -11,5 +11,13 @@ Route::get('dashboard', function () {
     return Inertia::render('Dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
-require __DIR__.'/settings.php';
-require __DIR__.'/auth.php';
+Route::group(['middleware' => 'auth'], function () {
+    $webRoutes = glob(__DIR__ . '/web/*.php');
+
+    foreach ($webRoutes as $route) {
+        require $route;
+    }
+});
+
+require __DIR__ . '/settings.php';
+require __DIR__ . '/auth.php';
