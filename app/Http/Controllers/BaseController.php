@@ -30,7 +30,7 @@ abstract class BaseController extends Controller
             $items = $this->resourceClass::collection($items);
         }
 
-        return Inertia::render($this->viewPrefix . '/Index', [
+        return Inertia::render($this->viewPrefix . '/index', [
             'items' => $items
         ]);
     }
@@ -51,7 +51,7 @@ abstract class BaseController extends Controller
             $item = new $this->resourceClass($item);
         }
 
-        return Inertia::render($this->viewPrefix . '/Show', [
+        return Inertia::render($this->viewPrefix . '/show', [
             'item' => $item
         ]);
     }
@@ -87,7 +87,7 @@ abstract class BaseController extends Controller
     {
         // Determinar o caminho do arquivo
         $formName = $customForm ?? $this->modelName;
-        $formPath = app_path("Http/Forms/{$formName}.php");
+        $formPath = config_path("forms/{$formName}.php");
 
         if (!File::exists($formPath)) {
             return $this->getDefaultFormDefinition();

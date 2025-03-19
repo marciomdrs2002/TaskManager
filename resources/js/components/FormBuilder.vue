@@ -1,198 +1,308 @@
+<template>
+    <Dialog
+        v-model:visible="visible"
+        :header="pageTitle"
+        :style="{ width: '50rem' }"
+        :modal="true"
+        :closable="true"
+        @hide="cancel"
+        v-if="showModal && definition && form"
+    >
+        <div class="p-fluid">
+            <form @submit.prevent="submit">
+                <!-- Layout de duas colunas -->
+                <div class="space-y-6">
+                    <div v-for="(pair, index) in fieldPairs" :key="index" class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <!-- Campos em pares -->
+                        <div v-for="field in pair" :key="field.name" class="field">
+                            <!-- Campo de texto -->
+                            <template v-if="field.type === 'text'">
+                                <label :for="field.name" class="mb-2 block text-sm font-medium">
+                                    {{ field.label }}
+                                    <span v-if="field.required" class="text-red-500">*</span>
+                                </label>
+                                <InputText
+                                    :id="field.name"
+                                    v-model="form[field.name]"
+                                    :placeholder="field.placeholder"
+                                    :required="field.required"
+                                    class="w-full"
+                                    :class="{ 'p-invalid': form.errors[field.name] }"
+                                />
+                                <small v-if="form.errors[field.name]" class="p-error mt-1 block">{{ form.errors[field.name] }}</small>
+                            </template>
+
+                            <!-- Campo de textarea -->
+                            <template v-else-if="field.type === 'textarea'">
+                                <label :for="field.name" class="mb-2 block text-sm font-medium">
+                                    {{ field.label }}
+                                    <span v-if="field.required" class="text-red-500">*</span>
+                                </label>
+                                <Textarea
+                                    :id="field.name"
+                                    v-model="form[field.name]"
+                                    :placeholder="field.placeholder"
+                                    :required="field.required"
+                                    :rows="field.rows || 3"
+                                    :autoResize="true"
+                                    class="w-full"
+                                    :class="{ 'p-invalid': form.errors[field.name] }"
+                                />
+                                <small v-if="form.errors[field.name]" class="p-error mt-1 block">{{ form.errors[field.name] }}</small>
+                            </template>
+
+                            <!-- Campo de select/dropdown -->
+                            <template v-else-if="field.type === 'select'">
+                                <label :for="field.name" class="mb-2 block text-sm font-medium">
+                                    {{ field.label }}
+                                    <span v-if="field.required" class="text-red-500">*</span>
+                                </label>
+                                <Dropdown
+                                    :id="field.name"
+                                    v-model="form[field.name]"
+                                    :options="Object.entries(field.options).map(([value, label]) => ({ label, value }))"
+                                    optionLabel="label"
+                                    optionValue="value"
+                                    :placeholder="field.placeholder"
+                                    class="w-full"
+                                    :class="{ 'p-invalid': form.errors[field.name] }"
+                                />
+                                <small v-if="form.errors[field.name]" class="p-error mt-1 block">{{ form.errors[field.name] }}</small>
+                            </template>
+
+                            <!-- Campo de checkbox -->
+                            <template v-else-if="field.type === 'checkbox'">
+                                <div class="mt-6 flex items-center">
+                                    <Checkbox
+                                        :id="field.name"
+                                        v-model="form[field.name]"
+                                        :binary="true"
+                                        :class="{ 'p-invalid': form.errors[field.name] }"
+                                    />
+                                    <label :for="field.name" class="ml-2 text-sm">
+                                        {{ field.label }}
+                                        <span v-if="field.required" class="text-red-500">*</span>
+                                    </label>
+                                </div>
+                                <small v-if="form.errors[field.name]" class="p-error mt-1 block">{{ form.errors[field.name] }}</small>
+                            </template>
+
+                            <!-- Campo de data -->
+                            <template v-else-if="field.type === 'date'">
+                                <label :for="field.name" class="mb-2 block text-sm font-medium">
+                                    {{ field.label }}
+                                    <span v-if="field.required" class="text-red-500">*</span>
+                                </label>
+                                <Calendar
+                                    :id="field.name"
+                                    v-model="form[field.name]"
+                                    dateFormat="dd/mm/yy"
+                                    :showIcon="true"
+                                    :required="field.required"
+                                    :class="{ 'p-invalid': form.errors[field.name] }"
+                                />
+                                <small v-if="form.errors[field.name]" class="p-error mt-1 block">{{ form.errors[field.name] }}</small>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botões de ação -->
+                <div class="mt-8 flex justify-end space-x-3">
+                    <Button type="button" label="Cancelar" class="p-button-outlined p-button-secondary" @click="cancel" :disabled="form.processing" />
+                    <Button
+                        type="submit"
+                        :label="form.processing ? 'Processando...' : 'Salvar'"
+                        class="p-button-primary"
+                        :disabled="form.processing"
+                        :loading="form.processing"
+                    />
+                </div>
+            </form>
+        </div>
+    </Dialog>
+
+    <div v-else-if="!isLoading && (!definition || !form)" class="rounded-lg bg-white p-4 shadow dark:bg-gray-800">
+        <div class="p-message p-message-error">
+            <div class="p-message-wrapper">
+                <span class="p-message-icon pi pi-times-circle"></span>
+                <div class="p-message-text">Erro ao carregar formulário. Verifique a configuração do componente.</div>
+            </div>
+        </div>
+    </div>
+</template>
+
 <script setup>
-// import { XMarkIcon } from '@heroicons/vue/24/outline';
 import { useForm } from '@inertiajs/vue3';
-import Button from './ui/button/Button.vue';
+import axios from 'axios';
+import { computed, onMounted, ref, watch } from 'vue';
+
+import Button from 'primevue/button';
+import Calendar from 'primevue/calendar';
+import Checkbox from 'primevue/checkbox';
+import Dialog from 'primevue/dialog';
+import Dropdown from 'primevue/dropdown';
+import InputText from 'primevue/inputtext';
+import Textarea from 'primevue/textarea';
 
 const props = defineProps({
-    formDefinition: {
-        type: Object,
-        required: true,
-    },
-    initialValues: {
-        type: Object,
-        default: () => ({}),
-    },
-    submitUrl: {
+    modelName: {
         type: String,
         required: true,
+        description: 'Nome do modelo (ex: "tasks", "projects")',
     },
-    method: {
-        type: String,
-        default: 'post',
+    itemId: {
+        type: [Number, String],
+        default: null,
+        description: 'ID do item a ser editado (null para criação)',
     },
     showModal: {
         type: Boolean,
         default: true,
+        description: 'Exibir como modal ou como parte da página',
     },
     title: {
         type: String,
-        default: 'Formulário',
+        default: null,
+        description: 'Título personalizado (sobrescreve o título automático)',
+    },
+
+    customEndpoint: {
+        type: String,
+        default: null,
+        description: 'Endpoint personalizado para carregar definição do formulário',
     },
 });
 
-const emit = defineEmits(['submit', 'cancel', 'close']);
+const emit = defineEmits(['submit', 'cancel']);
 
-const formValues = {};
-props.formDefinition.fields.forEach((field) => {
-    formValues[field.name] = props.initialValues[field.name] ?? '';
+// Estado interno
+const isLoading = ref(false);
+const definition = ref(null);
+const formData = ref({});
+const form = ref(null);
+const visible = ref(props.showModal);
+
+// Valores computados
+const isEdit = computed(() => !!props.itemId);
+const pageTitle = computed(() => {
+    if (props.title) return props.title;
+    return isEdit.value ? `Editar ${props.modelName}` : `Novo ${props.modelName}`;
 });
 
-const form = useForm(formValues);
+const formSubmitUrl = computed(() => {
+    const basePath = `${props.modelName}`;
+    if (isEdit.value) {
+        return route(`${basePath}.update`, props.itemId);
+    }
+    return route(`${basePath}.store`);
+});
+
+const fieldPairs = computed(() => {
+    if (!definition.value || !definition.value.fields) return [];
+
+    const fields = definition.value.fields;
+    const pairs = [];
+
+    for (let i = 0; i < fields.length; i += 2) {
+        const pair = [fields[i]];
+        if (i + 1 < fields.length) {
+            pair.push(fields[i + 1]);
+        }
+        pairs.push(pair);
+    }
+
+    return pairs;
+});
+
+const loadFormData = async () => {
+    isLoading.value = true;
+
+    try {
+        const endpoint =
+            props.customEndpoint ||
+            (props.itemId ? route(`${props.modelName}.form-definition`, props.itemId) : route(`${props.modelName}.form-definition`));
+
+        const response = await axios.get(endpoint);
+        definition.value = response.data.formDefinition;
+
+        if (props.itemId && response.data.item) {
+            formData.value = response.data.item;
+        }
+
+        setupForm();
+        emit('loaded', { formDefinition: definition.value, data: formData.value });
+    } catch (error) {
+        console.error(`Erro ao carregar formulário para ${props.modelName}:`, error);
+    } finally {
+        isLoading.value = false;
+    }
+};
+
+const setupForm = () => {
+    if (!definition.value || !definition.value.fields) return;
+
+    const values = {};
+    definition.value.fields.forEach((field) => {
+        let value = formData.value[field.name] ?? '';
+
+        // Conversões de tipos para campos específicos
+        if (field.type === 'select' && value !== null && value !== undefined && value !== '') {
+            // Garantir que o dropdown receba o valor no formato correto
+            value = String(value);
+        } else if (field.type === 'checkbox') {
+            value = !!value;
+        } else if (field.type === 'date' && value && !(value instanceof Date)) {
+            value = new Date(value);
+        }
+
+        values[field.name] = value;
+    });
+
+    form.value = useForm(values);
+};
 
 const submit = () => {
-    form[props.method](props.submitUrl, {
+    if (!form.value) return;
+
+    const method = isEdit.value ? 'put' : 'post';
+
+    form.value[method](formSubmitUrl.value, {
         onSuccess: () => {
-            emit('submit', form);
+            emit('submit', form.value);
+            visible.value = false;
+        },
+        onError: (errors) => {
+            console.error('Erros de validação:', errors);
         },
     });
 };
 
 const cancel = () => {
     emit('cancel');
+    visible.value = false;
 };
 
-const closeModal = () => {
-    emit('close');
-};
+watch(
+    () => [props.modelName, props.itemId],
+    () => {
+        if (props.modelName) {
+            loadFormData();
+        }
+    },
+    { immediate: false },
+);
+
+watch(
+    () => props.showModal,
+    (newValue) => {
+        visible.value = newValue;
+    },
+);
+
+onMounted(() => {
+    if (props.modelName) {
+        loadFormData();
+    }
+});
 </script>
-
-<template>
-    <div v-if="showModal" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-        <div class="flex min-h-screen items-end justify-center px-4 pb-20 pt-4 text-center sm:block sm:p-0">
-            <!-- Background overlay -->
-            <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity" aria-hidden="true" @click="closeModal"></div>
-
-            <!-- Modal panel -->
-            <div
-                class="inline-block transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:align-middle dark:bg-gray-800"
-            >
-                <div class="bg-white px-4 pb-4 pt-5 dark:bg-gray-800 sm:p-6 sm:pb-4">
-                    <div class="flex items-center justify-between pb-3">
-                        <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-gray-100" id="modal-title">
-                            {{ title }}
-                        </h3>
-                        <button
-                            type="button"
-                            class="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:bg-gray-800 dark:text-gray-300 dark:hover:text-gray-100"
-                            @click="closeModal"
-                        >
-                            <span class="sr-only">Fechar</span>
-                            <XMarkIcon class="h-6 w-6" aria-hidden="true" />
-                        </button>
-                    </div>
-
-                    <div class="mt-2">
-                        <form @submit.prevent="submit">
-                            <div class="space-y-4">
-                                <div v-for="field in formDefinition.fields" :key="field.name" class="mb-4">
-                                    <!-- Campo de texto -->
-                                    <div v-if="field.type === 'text'" class="form-group">
-                                        <label :for="field.name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                            {{ field.label }}
-                                        </label>
-                                        <input
-                                            :id="field.name"
-                                            v-model="form[field.name]"
-                                            :type="field.type"
-                                            :placeholder="field.placeholder"
-                                            :required="field.required"
-                                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-gray-500 focus:ring-gray-500 dark:border-gray-700 dark:bg-gray-800 sm:text-sm"
-                                        />
-                                        <p v-if="form.errors[field.name]" class="mt-1 text-sm text-red-600">{{ form.errors[field.name] }}</p>
-                                    </div>
-
-                                    <!-- Campo de texto de área -->
-                                    <div v-else-if="field.type === 'textarea'" class="form-group">
-                                        <label :for="field.name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                            {{ field.label }}
-                                        </label>
-                                        <textarea
-                                            :id="field.name"
-                                            v-model="form[field.name]"
-                                            :placeholder="field.placeholder"
-                                            :required="field.required"
-                                            :rows="field.rows || 3"
-                                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-gray-500 focus:ring-gray-500 dark:border-gray-700 dark:bg-gray-800 sm:text-sm"
-                                        ></textarea>
-                                        <p v-if="form.errors[field.name]" class="mt-1 text-sm text-red-600">{{ form.errors[field.name] }}</p>
-                                    </div>
-
-                                    <!-- Campo de seleção -->
-                                    <div v-else-if="field.type === 'select'" class="form-group">
-                                        <label :for="field.name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                            {{ field.label }}
-                                        </label>
-                                        <select
-                                            :id="field.name"
-                                            v-model="form[field.name]"
-                                            :required="field.required"
-                                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-gray-500 focus:ring-gray-500 dark:border-gray-700 dark:bg-gray-800 sm:text-sm"
-                                        >
-                                            <option value="" disabled selected>{{ field.placeholder }}</option>
-                                            <option v-for="(label, value) in field.options" :key="value" :value="value">
-                                                {{ label }}
-                                            </option>
-                                        </select>
-                                        <p v-if="form.errors[field.name]" class="mt-1 text-sm text-red-600">{{ form.errors[field.name] }}</p>
-                                    </div>
-
-                                    <!-- Campo de checkbox -->
-                                    <div v-else-if="field.type === 'checkbox'" class="form-group">
-                                        <div class="flex items-center">
-                                            <input
-                                                :id="field.name"
-                                                v-model="form[field.name]"
-                                                type="checkbox"
-                                                class="h-4 w-4 rounded border-gray-300 text-black focus:ring-gray-500 dark:border-gray-700"
-                                            />
-                                            <label :for="field.name" class="ml-2 block text-sm text-gray-700 dark:text-gray-300">
-                                                {{ field.label }}
-                                            </label>
-                                        </div>
-                                        <p v-if="form.errors[field.name]" class="mt-1 text-sm text-red-600">{{ form.errors[field.name] }}</p>
-                                    </div>
-
-                                    <!-- Campo de data -->
-                                    <div v-else-if="field.type === 'date'" class="form-group">
-                                        <label :for="field.name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                            {{ field.label }}
-                                        </label>
-                                        <input
-                                            :id="field.name"
-                                            v-model="form[field.name]"
-                                            type="date"
-                                            :required="field.required"
-                                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-gray-500 focus:ring-gray-500 dark:border-gray-700 dark:bg-gray-800 sm:text-sm"
-                                        />
-                                        <p v-if="form.errors[field.name]" class="mt-1 text-sm text-red-600">{{ form.errors[field.name] }}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Botões de ação -->
-                            <div class="mt-5 sm:mt-6 sm:grid sm:grid-flow-row-dense sm:grid-cols-2 sm:gap-3">
-                                <Button
-                                    v-for="action in formDefinition.actions.filter((a) => a.type === 'submit')"
-                                    :key="action.label"
-                                    type="submit"
-                                    class="inline-flex w-full justify-center rounded-md border border-transparent bg-gray-800 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 sm:col-start-2 sm:text-sm"
-                                    :disabled="form.processing"
-                                >
-                                    {{ form.processing ? 'Processando...' : action.label }}
-                                </Button>
-
-                                <button
-                                    type="button"
-                                    class="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 sm:col-start-1 sm:mt-0 sm:text-sm"
-                                    @click="cancel"
-                                >
-                                    Cancelar
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</template>

@@ -34,9 +34,9 @@ class TaskController extends BaseController
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'completed' => 'boolean',
-            'deadline' => 'nullable|date',
+            'deadline' => 'nullable|date|after:today',
             'assignee_id' => 'nullable|exists:users,id',
-            'priority' => 'required|integer|min:1|max:3',
+            'priority' => 'required|integer|min:1',
         ];
     }
 

@@ -18,7 +18,8 @@ class Task extends BaseModel
     {
         static::addGlobalScope('owner', function (Builder $builder) {
             if (Auth::check()) {
-                $builder->where('owner_id', Auth::id());
+                $builder->where('owner_id', Auth::id())
+                    ->orWhere('assignee_id', Auth::id());
             }
         });
 
@@ -89,5 +90,20 @@ class Task extends BaseModel
             ->get()
             ->pluck('name', 'id')
             ->toArray();
+    }
+
+    public function isAssigned()
+    {
+        return $this->assignee_id === Auth::id();
+    }
+
+    public function canCompleteTask()
+    {
+        return $this->isAssigned() && !$this->completed;
+    }
+
+    public function canEditTask()
+    {
+        return !$this->completed;
     }
 }

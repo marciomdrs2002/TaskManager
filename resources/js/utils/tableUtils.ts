@@ -58,3 +58,7 @@ export const onFilterChange = (routeName: string, filters = {}) => {
     // Realiza a navegação com Inertia
     router.get(route(routeName), cleanedParams, { preserveState: true, preserveScroll: true });
 };
+
+export const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString('pt-BR');
+}

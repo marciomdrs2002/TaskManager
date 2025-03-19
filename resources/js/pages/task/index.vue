@@ -57,11 +57,15 @@
                     class="hidden w-[100px] min-w-[80px] max-w-[100px] truncate dark:text-gray-200 md:table-cell"
                 ></column>
                 <column
-                    sortable
                     field="deadline"
+                    sortable
                     header="Prazo"
                     class="hidden w-[110px] min-w-[90px] max-w-[110px] truncate dark:text-gray-200 lg:table-cell"
-                ></column>
+                >
+                    <template #body="{ data }">
+                        {{ formatDate(data.deadline) }}
+                    </template>
+                </column>
 
                 <column field="completed" sortable header="Situação" class="w-[90px] min-w-[90px] max-w-[100px]">
                     <template #body="{ data }">
@@ -81,15 +85,10 @@
                 <column header="Ações" class="w-[100px] min-w-[90px] max-w-[110px] text-center">
                     <template #body="{ data }">
                         <div class="flex flex-wrap items-center justify-center gap-1">
-                            <Button
-                                v-if="data.assignee.id === $page.props.auth.user.id && !data.completed"
-                                variant="success"
-                                @click="completeTask(data.id)"
-                                class="p-1 md:p-2"
-                            >
+                            <Button v-if="data.can_complete_task" variant="success" @click="completeTask(data.id)" class="p-1 md:p-2">
                                 <Check class="h-3 w-3 md:h-4 md:w-4" />
                             </Button>
-                            <Button @click="editTask(data.id)" class="p-1 md:p-2">
+                            <Button v-if="data.can_edit_task" @click="editTask(data.id)" class="p-1 md:p-2">
                                 <Pencil class="h-3 w-3 md:h-4 md:w-4" />
                             </Button>
                             <Button variant="destructive" @click="deleteTask(data.id)" class="p-1 md:p-2">
@@ -118,7 +117,7 @@ import PageHeader from '@/components/PageHeader.vue';
 import Button from '@/components/ui/button/Button.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { Task } from '@/types';
-import { defaultSorting, onFilterChange, onPageChange, onSortChange } from '@/utils/tableUtils';
+import { defaultSorting, formatDate, onFilterChange, onPageChange, onSortChange } from '@/utils/tableUtils';
 import { router } from '@inertiajs/vue3';
 import { Check, Pencil, Plus, Search, Trash } from 'lucide-vue-next';
 import Column from 'primevue/column';
@@ -126,7 +125,7 @@ import DataTable from 'primevue/datatable';
 import InputText from 'primevue/inputtext';
 import { useToast } from 'primevue/usetoast';
 import { onMounted, ref, watch } from 'vue';
-import FormTask from './FormTask.vue';
+import FormTask from './forms/formTask.vue';
 
 const toast = useToast();
 const props = defineProps<{
