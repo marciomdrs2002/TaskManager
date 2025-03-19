@@ -53,7 +53,7 @@ export const onFilterChange = (routeName: string, filters = {}) => {
     };
 
     // Remove chaves com valores vazios
-    const cleanedParams = Object.fromEntries(Object.entries(mergedParams).filter(([key, value]) => value != null && value !== ''));
+    const cleanedParams = Object.fromEntries(Object.entries(mergedParams).filter(([value]) => value != null && value !== ''));
 
     // Realiza a navegação com Inertia
     router.get(route(routeName), cleanedParams, { preserveState: true, preserveScroll: true });
